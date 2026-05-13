@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Embraer · Media Intelligence Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --embraer-blue: #003DA5;
+    --embraer-dark: #001A4E;
+    --embraer-light: #0059D6;
+    --fh-orange: #FF6600;
+    --fh-orange-soft: #FF8533;
+    --neutral-50: #F7F8FC;
+    --neutral-100: #ECEEF5;
+    --neutral-200: #D5D9E8;
+    --neutral-400: #8A93B2;
+    --neutral-600: #4A5278;
+    --neutral-900: #0D1035;
+    --positive: #00B67A;
+    --negative: #E53E3E;
+    --neutral-sent: #8A93B2;
+    --card-bg: #FFFFFF;
+    --shadow: 0 2px 16px rgba(0,29,78,0.08);
+    --shadow-lg: 0 8px 40px rgba(0,29,78,0.14);
+    --radius: 12px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Barlow', sans-serif;
+    background: var(--neutral-50);
+    color: var(--neutral-900);
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--embraer-dark);
+    padding: 0 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 72px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 20px rgba(0,0,0,0.3);
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+  }
+
+  .logo-embraer img {
+    height: 32px;
+    filter: brightness(0) invert(1);
+  }
+
+  .header-divider {
+    width: 1px;
+    height: 36px;
+    background: rgba(255,255,255,0.15);
+  }
+
+  .logo-fh img {
+    height: 24px;
+    filter: brightness(0) invert(1);
+    opacity: 0.85;
+  }
+
+  .header-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.6);
+    padding-left: 2rem;
+    border-left: 1px solid rgba(255,255,255,0.1);
+    line-height: 1.3;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .period-badge {
+    background: rgba(255,102,0,0.15);
+    border: 1px solid rgba(255,102,0,0.35);
+    color: var(--fh-orange-soft);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border-radius: 20px;
+  }
+
+  .data-status {
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.4);
+    font-weight: 300;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  main {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem 2.5rem 4rem;
+  }
+
+  /* ── LOADING ── */
+  #loading-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--embraer-dark);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    transition: opacity 0.6s ease;
+  }
+
+  #loading-screen.hidden { opacity: 0; pointer-events: none; }
+
+  .loading-plane {
+    font-size: 3rem;
+    animation: fly 1.5s ease-in-out infinite;
+  }
+
+  @keyframes fly {
+    0%, 100% { transform: translateY(0) rotate(-5deg); }
+    50% { transform: translateY(-14px) rotate(3deg); }
+  }
+
+  .loading-text {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.6);
+    margin-top: 1.5rem;
+  }
+
+  .loading-bar {
+    width: 220px;
+    height: 2px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+    margin-top: 1rem;
+    overflow: hidden;
+  }
+
+  .loading-bar-fill {
+    height: 100%;
+    background: var(--fh-orange);
+    animation: load 2s ease-in-out infinite;
+    border-radius: 2px;
+  }
+
+  @keyframes load {
+    0% { width: 0%; }
+    60% { width: 85%; }
+    100% { width: 100%; }
+  }
+
+  /* ── SECTION LABEL ── */
+  .section-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--neutral-400);
+    margin-bottom: 1rem;
+    margin-top: 2.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--neutral-200);
+  }
+
+  /* ── FILTERS ── */
+  .filters-bar {
+    background: var(--card-bg);
+    border: 1px solid var(--neutral-200);
+    border-radius: var(--radius);
+    padding: 1rem 1.5rem;
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow);
+  }
+
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 140px;
+  }
+
+  .filter-group label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--neutral-400);
+  }
+
+  .filter-group select {
+    border: 1px solid var(--neutral-200);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-family: 'Barlow', sans-serif;
+    font-size: 0.85rem;
+    color: var(--neutral-900);
+    background: var(--neutral-50);
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238A93B2' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+  }
+
+  .filter-group select:focus { border-color: var(--embraer-blue); }
+
+  .btn-reset {
+    background: var(--embraer-blue);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 18px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    align-self: flex-end;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .btn-reset:hover { background: var(--embraer-light); transform: translateY(-1px); }
+
+  .filter-results {
+    margin-left: auto;
+    align-self: flex-end;
+    font-size: 0.8rem;
+    color: var(--neutral-400);
+    font-weight: 500;
+    padding-bottom: 9px;
+  }
+
+  /* ── KPI GRID ── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .kpi-card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    padding: 1.4rem 1.5rem;
+    border: 1px solid var(--neutral-200);
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .kpi-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--accent, var(--embraer-blue));
+  }
+
+  .kpi-icon {
+    font-size: 1.4rem;
+    margin-bottom: 0.2rem;
+  }
+
+  .kpi-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--neutral-400);
+  }
+
+  .kpi-value {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 2.4rem;
+    font-weight: 700;
+    color: var(--neutral-900);
+    line-height: 1;
+  }
+
+  .kpi-sub {
+    font-size: 0.75rem;
+    color: var(--neutral-400);
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  /* ── CHART GRID ── */
+  .chart-grid {
+    display: grid;
+    gap: 1.2rem;
+  }
+
+  .chart-grid-2 { grid-template-columns: 1fr 1fr; }
+  .chart-grid-3 { grid-template-columns: 2fr 1fr; }
+
+  .chart-card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    border: 1px solid var(--neutral-200);
+    box-shadow: var(--shadow);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    transition: box-shadow 0.2s;
+  }
+  .chart-card:hover { box-shadow: var(--shadow-lg); }
+
+  .chart-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+
+  .chart-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--neutral-900);
+  }
+
+  .chart-subtitle {
+    font-size: 0.75rem;
+    color: var(--neutral-400);
+    margin-top: 2px;
+    font-weight: 400;
+  }
+
+  .chart-canvas-wrap {
+    position: relative;
+    flex: 1;
+  }
+
+  /* ── SENTIMENT SUMMARY ── */
+  .sentiment-bar-wrap {
+    display: flex;
+    gap: 6px;
+    height: 10px;
+    border-radius: 5px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+  }
+  .sentiment-seg { border-radius: 0; transition: flex 0.6s ease; }
+
+  .sentiment-legend {
+    display: flex;
+    gap: 1.2rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+  }
+  .sent-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+  .sent-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  /* ── TOP TABLE ── */
+  .table-wrap {
+    overflow-x: auto;
+    border-radius: var(--radius);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+
+  thead th {
+    background: var(--embraer-dark);
+    color: rgba(255,255,255,0.75);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 11px 14px;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--neutral-100);
+    transition: background 0.15s;
+  }
+  tbody tr:hover { background: var(--neutral-50); }
+
+  tbody td {
+    padding: 10px 14px;
+    color: var(--neutral-900);
+    vertical-align: middle;
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: capitalize;
+  }
+
+  .badge-positive { background: #E6F8F2; color: var(--positive); }
+  .badge-negative { background: #FEE8E8; color: var(--negative); }
+  .badge-neutral { background: var(--neutral-100); color: var(--neutral-400); }
+  .badge-bluesky { background: #E8F0FE; color: #0059D6; }
+  .badge-news { background: #FFF3E8; color: #CC5500; }
+  .badge-twitter { background: #E8F5FE; color: #0077B5; }
+
+  /* ── TOP DOMAINS ── */
+  .domain-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-top: 0.5rem;
+  }
+
+  .domain-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.82rem;
+  }
+
+  .domain-bar-bg {
+    flex: 1;
+    height: 8px;
+    background: var(--neutral-100);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .domain-bar-fill {
+    height: 100%;
+    background: var(--embraer-blue);
+    border-radius: 4px;
+    transition: width 0.6s ease;
+  }
+
+  .domain-name {
+    width: 160px;
+    font-weight: 500;
+    color: var(--neutral-600);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .domain-count {
+    width: 40px;
+    text-align: right;
+    font-weight: 700;
+    color: var(--neutral-900);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.9rem;
+  }
+
+  /* ── PAGINATION ── */
+  .table-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 1rem;
+    font-size: 0.78rem;
+    color: var(--neutral-400);
+  }
+
+  .pagination-btns {
+    display: flex;
+    gap: 6px;
+  }
+
+  .pg-btn {
+    background: var(--card-bg);
+    border: 1px solid var(--neutral-200);
+    color: var(--neutral-600);
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.15s;
+    font-family: 'Barlow', sans-serif;
+  }
+  .pg-btn:hover, .pg-btn.active { background: var(--embraer-blue); color: white; border-color: var(--embraer-blue); }
+
+  /* ── FOOTER ── */
+  footer {
+    background: var(--embraer-dark);
+    color: rgba(255,255,255,0.35);
+    font-size: 0.72rem;
+    padding: 1.2rem 2.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 900px) {
+    .chart-grid-2, .chart-grid-3 { grid-template-columns: 1fr; }
+    main { padding: 1.5rem 1rem 3rem; }
+    header { padding: 0 1rem; }
+    .header-title { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading-screen">
+  <div class="loading-plane">✈</div>
+  <div class="loading-text">Carregando dados · Embraer</div>
+  <div class="loading-bar"><div class="loading-bar-fill"></div></div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="header-left">
+    <div class="logo-embraer">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/4/4e/Embraer_logo.png" alt="Embraer">
+    </div>
+    <div class="header-divider"></div>
+    <div class="logo-fh">
+      <img src="https://e7.pngegg.com/pngimages/909/917/png-clipart-fleishmanhillard-public-relations-business-fleishman-hillard-canada-inc-management-business-blue-text.png" alt="FleishmanHillard">
+    </div>
+    <div class="header-title">Media Intelligence<br>Dashboard</div>
+  </div>
+  <div class="header-right">
+    <div class="period-badge">14 abr – 13 mai 2026</div>
+    <div class="data-status" id="data-status">—</div>
+  </div>
+</header>
+
+<!-- MAIN -->
+<main>
+
+  <!-- FILTERS -->
+  <div class="section-label">Filtros</div>
+  <div class="filters-bar">
+    <div class="filter-group">
+      <label>Sentimento</label>
+      <select id="f-sentiment">
+        <option value="">Todos</option>
+        <option value="positive">Positivo</option>
+        <option value="negative">Negativo</option>
+        <option value="neutral">Neutro</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Plataforma</label>
+      <select id="f-pagetype">
+        <option value="">Todas</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Idioma</label>
+      <select id="f-language">
+        <option value="">Todos</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>País</label>
+      <select id="f-country">
+        <option value="">Todos</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Continente</label>
+      <select id="f-continent">
+        <option value="">Todos</option>
+      </select>
+    </div>
+    <button class="btn-reset" onclick="resetFilters()">↺ Limpar</button>
+    <div class="filter-results" id="filter-results">— menções</div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="section-label">Visão Geral</div>
+  <div class="kpi-grid">
+    <div class="kpi-card" style="--accent: var(--embraer-blue)">
+      <div class="kpi-icon">📡</div>
+      <div class="kpi-label">Total de Menções</div>
+      <div class="kpi-value" id="kpi-total">—</div>
+      <div class="kpi-sub">últimos 30 dias</div>
+    </div>
+    <div class="kpi-card" style="--accent: var(--positive)">
+      <div class="kpi-icon">✅</div>
+      <div class="kpi-label">Positivas</div>
+      <div class="kpi-value" id="kpi-positive">—</div>
+      <div class="kpi-sub" id="kpi-positive-pct">—</div>
+    </div>
+    <div class="kpi-card" style="--accent: var(--negative)">
+      <div class="kpi-icon">⚠️</div>
+      <div class="kpi-label">Negativas</div>
+      <div class="kpi-value" id="kpi-negative">—</div>
+      <div class="kpi-sub" id="kpi-negative-pct">—</div>
+    </div>
+    <div class="kpi-card" style="--accent: var(--neutral-sent)">
+      <div class="kpi-icon">➖</div>
+      <div class="kpi-label">Neutras</div>
+      <div class="kpi-value" id="kpi-neutral">—</div>
+      <div class="kpi-sub" id="kpi-neutral-pct">—</div>
+    </div>
+    <div class="kpi-card" style="--accent: var(--fh-orange)">
+      <div class="kpi-icon">🌐</div>
+      <div class="kpi-label">Domínios Únicos</div>
+      <div class="kpi-value" id="kpi-domains">—</div>
+      <div class="kpi-sub">fontes distintas</div>
+    </div>
+    <div class="kpi-card" style="--accent: #6C3FC5">
+      <div class="kpi-icon">👤</div>
+      <div class="kpi-label">Autores Únicos</div>
+      <div class="kpi-value" id="kpi-authors">—</div>
+      <div class="kpi-sub">vozes identificadas</div>
+    </div>
+    <div class="kpi-card" style="--accent: #00B8A9">
+      <div class="kpi-icon">❤️</div>
+      <div class="kpi-label">Total de Likes</div>
+      <div class="kpi-value" id="kpi-likes">—</div>
+      <div class="kpi-sub">engajamento acumulado</div>
+    </div>
+    <div class="kpi-card" style="--accent: #F6C90E">
+      <div class="kpi-icon">🔁</div>
+      <div class="kpi-label">Total de Shares</div>
+      <div class="kpi-value" id="kpi-shares">—</div>
+      <div class="kpi-sub">amplificação orgânica</div>
+    </div>
+  </div>
+
+  <!-- TIMELINE + SENTIMENT DONUT -->
+  <div class="section-label">Linha do Tempo & Sentimento</div>
+  <div class="chart-grid chart-grid-3">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Volume de Menções por Dia</div>
+          <div class="chart-subtitle">Distribuição temporal — 30 dias</div>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap" style="height:240px">
+        <canvas id="chart-timeline"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Sentimento</div>
+          <div class="chart-subtitle">Proporção geral</div>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap" style="height:200px">
+        <canvas id="chart-sentiment"></canvas>
+      </div>
+      <div class="sentiment-legend" id="sent-legend"></div>
+    </div>
+  </div>
+
+  <!-- PLATFORM + LANGUAGE -->
+  <div class="section-label">Plataforma & Idioma</div>
+  <div class="chart-grid chart-grid-2">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Menções por Plataforma</div>
+          <div class="chart-subtitle">Redes sociais e portais de notícias</div>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap" style="height:220px">
+        <canvas id="chart-platform"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Distribuição por Idioma</div>
+          <div class="chart-subtitle">PT · EN · ES e outros</div>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap" style="height:220px">
+        <canvas id="chart-language"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOP COUNTRIES + DOMAINS -->
+  <div class="section-label">Geografias & Fontes</div>
+  <div class="chart-grid chart-grid-2">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Top 10 Países</div>
+          <div class="chart-subtitle">Por volume de menções</div>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap" style="height:260px">
+        <canvas id="chart-countries"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Top Domínios</div>
+          <div class="chart-subtitle">Fontes com mais publicações</div>
+        </div>
+      </div>
+      <div class="domain-list" id="domain-list"></div>
+    </div>
+  </div>
+
+  <!-- SENTIMENT BY PLATFORM -->
+  <div class="section-label">Sentimento por Plataforma</div>
+  <div class="chart-grid" style="grid-template-columns: 1fr;">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Sentimento × Plataforma</div>
+          <div class="chart-subtitle">Positivo, neutro e negativo por canal</div>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap" style="height:240px">
+        <canvas id="chart-sent-platform"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOP MENTIONS TABLE -->
+  <div class="section-label">Menções Recentes</div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">Tabela de Menções</div>
+        <div class="chart-subtitle">Dados completos com filtros aplicados</div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Título / Snippet</th>
+            <th>Domínio</th>
+            <th>Plataforma</th>
+            <th>Idioma</th>
+            <th>País</th>
+            <th>Sentimento</th>
+            <th>Likes</th>
+            <th>Shares</th>
+          </tr>
+        </thead>
+        <tbody id="mentions-tbody"></tbody>
+      </table>
+    </div>
+    <div class="table-footer">
+      <div id="table-info">—</div>
+      <div class="pagination-btns" id="pagination"></div>
+    </div>
+  </div>
+
+</main>
+
+<!-- FOOTER -->
+<footer>
+  <span>Embraer · Media Intelligence Dashboard · FleishmanHillard Brasil</span>
+  <span>Período: 14 abr – 13 mai 2026 · Dados via Google Sheets</span>
+</footer>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────────
+const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTeteFBYHV3Sn__VuK2u7zg4WUSfU16Z6J0tFhSyEr1sQGNgBArCwXphuBbhmLNaf81KgtwPG_vh-Ae/pub?output=csv';
+
+const COLORS = {
+  blue:   '#003DA5',
+  light:  '#0059D6',
+  orange: '#FF6600',
+  pos:    '#00B67A',
+  neg:    '#E53E3E',
+  neu:    '#8A93B2',
+  purple: '#6C3FC5',
+  teal:   '#00B8A9',
+  yellow: '#F6C90E',
+};
+
+const PALETTE = ['#003DA5','#FF6600','#00B67A','#6C3FC5','#F6C90E','#00B8A9','#E53E3E','#8A93B2','#0059D6','#CC5500','#a29bfe','#fd79a8'];
+
+// ── STATE ────────────────────────────────────────────────────────────
+let allData = [];
+let filteredData = [];
+let charts = {};
+let currentPage = 1;
+const PAGE_SIZE = 15;
+
+// ── UTILS ────────────────────────────────────────────────────────────
+const fmt = n => n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(1)+'k' : String(n);
+const count = (arr, key, val) => arr.filter(r => (r[key]||'').toLowerCase() === val.toLowerCase()).length;
+const uniq = (arr, key) => [...new Set(arr.map(r => r[key]).filter(Boolean))];
+const freq = (arr, key, top=15) => {
+  const m = {};
+  arr.forEach(r => { const v = r[key]||'Desconhecido'; m[v] = (m[v]||0)+1; });
+  return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,top);
+};
+
+function sentClass(s) {
+  const l = (s||'').toLowerCase();
+  if (l.includes('pos')) return 'positive';
+  if (l.includes('neg')) return 'negative';
+  return 'neutral';
+}
+
+function platformClass(p) {
+  const l = (p||'').toLowerCase();
+  if (l.includes('bluesky') || l.includes('bsky')) return 'bluesky';
+  if (l.includes('twitter') || l.includes('x.com')) return 'twitter';
+  return 'news';
+}
+
+// ── LOAD DATA ────────────────────────────────────────────────────────
+async function loadData() {
+  return new Promise((resolve, reject) => {
+    Papa.parse(CSV_URL, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: r => resolve(r.data),
+      error: e => reject(e)
+    });
+  });
+}
+
+// ── POPULATE FILTERS ─────────────────────────────────────────────────
+function populateFilter(id, key) {
+  const sel = document.getElementById(id);
+  const current = sel.value;
+  const vals = uniq(allData, key).sort();
+  const first = sel.options[0];
+  sel.innerHTML = '';
+  sel.appendChild(first);
+  vals.forEach(v => {
+    const o = document.createElement('option');
+    o.value = v; o.textContent = v;
+    sel.appendChild(o);
+  });
+  sel.value = current;
+}
+
+// ── APPLY FILTERS ────────────────────────────────────────────────────
+function applyFilters() {
+  const sent = document.getElementById('f-sentiment').value;
+  const pt   = document.getElementById('f-pagetype').value;
+  const lang = document.getElementById('f-language').value;
+  const cty  = document.getElementById('f-country').value;
+  const cont = document.getElementById('f-continent').value;
+
+  filteredData = allData.filter(r => {
+    if (sent && sentClass(r.Sentiment || r.sentiment || '') !== sent) return false;
+    const pageType = r['Page Type'] || r.PageType || r.page_type || '';
+    if (pt && pageType !== pt) return false;
+    const language = r.Language || r.language || '';
+    if (lang && language !== lang) return false;
+    const country = r.Country || r.country || '';
+    if (cty && country !== cty) return false;
+    const continent = r.Continent || r.continent || '';
+    if (cont && continent !== cont) return false;
+    return true;
+  });
+
+  currentPage = 1;
+  document.getElementById('filter-results').textContent = `${filteredData.length.toLocaleString('pt-BR')} menções`;
+  renderAll();
+}
+
+function resetFilters() {
+  ['f-sentiment','f-pagetype','f-language','f-country','f-continent'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  applyFilters();
+}
+
+// ── KPIs ─────────────────────────────────────────────────────────────
+function renderKPIs() {
+  const d = filteredData;
+  const pos = d.filter(r => sentClass(r.Sentiment || r.sentiment || '') === 'positive').length;
+  const neg = d.filter(r => sentClass(r.Sentiment || r.sentiment || '') === 'negative').length;
+  const neu = d.filter(r => sentClass(r.Sentiment || r.sentiment || '') === 'neutral').length;
+  const n = d.length || 1;
+  const likes  = d.reduce((a,r) => a + (parseFloat(r.Likes || r.likes || 0)||0), 0);
+  const shares = d.reduce((a,r) => a + (parseFloat(r.Shares || r.shares || 0)||0), 0);
+  const domains = new Set(d.map(r => r.Domain || r.domain || '')).size;
+  const authors = new Set(d.map(r => r.Author || r.author || '').filter(Boolean)).size;
+
+  document.getElementById('kpi-total').textContent   = d.length.toLocaleString('pt-BR');
+  document.getElementById('kpi-positive').textContent = pos.toLocaleString('pt-BR');
+  document.getElementById('kpi-positive-pct').textContent = `${((pos/n)*100).toFixed(1)}% do total`;
+  document.getElementById('kpi-negative').textContent = neg.toLocaleString('pt-BR');
+  document.getElementById('kpi-negative-pct').textContent = `${((neg/n)*100).toFixed(1)}% do total`;
+  document.getElementById('kpi-neutral').textContent  = neu.toLocaleString('pt-BR');
+  document.getElementById('kpi-neutral-pct').textContent  = `${((neu/n)*100).toFixed(1)}% do total`;
+  document.getElementById('kpi-domains').textContent  = domains.toLocaleString('pt-BR');
+  document.getElementById('kpi-authors').textContent  = authors.toLocaleString('pt-BR');
+  document.getElementById('kpi-likes').textContent    = fmt(likes);
+  document.getElementById('kpi-shares').textContent   = fmt(shares);
+}
+
+// ── CHART HELPERS ─────────────────────────────────────────────────────
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function makeChart(id, config) {
+  destroyChart(id);
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  charts[id] = new Chart(ctx, config);
+}
+
+// ── TIMELINE ─────────────────────────────────────────────────────────
+function renderTimeline() {
+  const byDay = {};
+  filteredData.forEach(r => {
+    const d = (r.Date || r.date || '').substring(0,10);
+    if (!d) return;
+    byDay[d] = (byDay[d]||0)+1;
+  });
+  const labels = Object.keys(byDay).sort();
+  const data   = labels.map(k => byDay[k]);
+
+  makeChart('chart-timeline', {
+    type: 'line',
+    data: {
+      labels: labels.map(l => {
+        const d = new Date(l+'T00:00:00');
+        return d.toLocaleDateString('pt-BR', {day:'2-digit', month:'short'});
+      }),
+      datasets: [{
+        label: 'Menções',
+        data,
+        borderColor: COLORS.blue,
+        backgroundColor: 'rgba(0,61,165,0.08)',
+        fill: true,
+        tension: 0.4,
+        pointRadius: data.length > 20 ? 2 : 4,
+        pointHoverRadius: 6,
+        pointBackgroundColor: COLORS.orange,
+        borderWidth: 2.5,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { mode:'index', intersect:false } },
+      scales: {
+        x: { grid: { color:'rgba(0,0,0,0.04)' }, ticks: { font:{size:11}, maxTicksLimit:10 } },
+        y: { grid: { color:'rgba(0,0,0,0.04)' }, beginAtZero:true, ticks:{font:{size:11}} }
+      }
+    }
+  });
+}
+
+// ── SENTIMENT DONUT ───────────────────────────────────────────────────
+function renderSentiment() {
+  const d = filteredData;
+  const pos = d.filter(r => sentClass(r.Sentiment || r.sentiment || '') === 'positive').length;
+  const neg = d.filter(r => sentClass(r.Sentiment || r.sentiment || '') === 'negative').length;
+  const neu = d.filter(r => sentClass(r.Sentiment || r.sentiment || '') === 'neutral').length;
+
+  makeChart('chart-sentiment', {
+    type: 'doughnut',
+    data: {
+      labels: ['Positivo','Neutro','Negativo'],
+      datasets: [{ data:[pos,neu,neg], backgroundColor:[COLORS.pos, COLORS.neu, COLORS.neg], borderWidth:0, hoverOffset:6 }]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      cutout: '68%',
+      plugins: {
+        legend: { display:false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const total = ctx.dataset.data.reduce((a,b)=>a+b,0)||1;
+              return ` ${ctx.label}: ${ctx.raw} (${((ctx.raw/total)*100).toFixed(1)}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+
+  const n = d.length || 1;
+  document.getElementById('sent-legend').innerHTML = [
+    ['Positivo', COLORS.pos, pos],
+    ['Neutro',   COLORS.neu, neu],
+    ['Negativo', COLORS.neg, neg],
+  ].map(([label,color,val]) => `
+    <div class="sent-item">
+      <div class="sent-dot" style="background:${color}"></div>
+      <span>${label}</span>
+      <strong>${((val/n)*100).toFixed(1)}%</strong>
+    </div>
+  `).join('');
+}
+
+// ── PLATFORM BAR ─────────────────────────────────────────────────────
+function renderPlatform() {
+  const key = 'Page Type';
+  const entries = freq(filteredData, key, 10);
+  makeChart('chart-platform', {
+    type: 'bar',
+    data: {
+      labels: entries.map(e=>e[0]),
+      datasets:[{ label:'Menções', data:entries.map(e=>e[1]), backgroundColor: PALETTE, borderRadius:6, borderSkipped:false }]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false, indexAxis:'y',
+      plugins:{ legend:{display:false}, tooltip:{mode:'index',intersect:false} },
+      scales:{
+        x:{ grid:{color:'rgba(0,0,0,0.04)'}, beginAtZero:true, ticks:{font:{size:11}} },
+        y:{ grid:{display:false}, ticks:{font:{size:11}} }
+      }
+    }
+  });
+}
+
+// ── LANGUAGE PIE ──────────────────────────────────────────────────────
+function renderLanguage() {
+  const entries = freq(filteredData, 'Language', 8);
+  makeChart('chart-language', {
+    type: 'pie',
+    data: {
+      labels: entries.map(e=>e[0]),
+      datasets:[{ data:entries.map(e=>e[1]), backgroundColor:PALETTE, borderWidth:2, borderColor:'#fff' }]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'right', labels:{font:{size:11}, boxWidth:14, padding:10}} }
+    }
+  });
+}
+
+// ── TOP COUNTRIES ─────────────────────────────────────────────────────
+function renderCountries() {
+  const entries = freq(filteredData, 'Country', 10);
+  makeChart('chart-countries', {
+    type:'bar',
+    data:{
+      labels:entries.map(e=>e[0]),
+      datasets:[{ label:'Menções', data:entries.map(e=>e[1]), backgroundColor:COLORS.blue, borderRadius:6, borderSkipped:false }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false, indexAxis:'y',
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ grid:{color:'rgba(0,0,0,0.04)'}, beginAtZero:true, ticks:{font:{size:11}} },
+        y:{ grid:{display:false}, ticks:{font:{size:11}} }
+      }
+    }
+  });
+}
+
+// ── DOMAINS LIST ──────────────────────────────────────────────────────
+function renderDomains() {
+  const entries = freq(filteredData, 'Domain', 12);
+  const max = entries[0]?.[1] || 1;
+  document.getElementById('domain-list').innerHTML = entries.map(([name,val]) => `
+    <div class="domain-item">
+      <div class="domain-name" title="${name}">${name}</div>
+      <div class="domain-bar-bg">
+        <div class="domain-bar-fill" style="width:${(val/max*100).toFixed(1)}%"></div>
+      </div>
+      <div class="domain-count">${val}</div>
+    </div>
+  `).join('');
+}
+
+// ── SENTIMENT x PLATFORM ──────────────────────────────────────────────
+function renderSentPlatform() {
+  const pageKey = 'Page Type';
+  const platforms = [...new Set(filteredData.map(r => r[pageKey]||'').filter(Boolean))].slice(0,8);
+  const datasets = [
+    { label:'Positivo', backgroundColor:COLORS.pos, data:[] },
+    { label:'Neutro',   backgroundColor:COLORS.neu, data:[] },
+    { label:'Negativo', backgroundColor:COLORS.neg, data:[] },
+  ];
+  platforms.forEach(p => {
+    const sub = filteredData.filter(r => (r[pageKey]||'') === p);
+    datasets[0].data.push(sub.filter(r=>sentClass(r.Sentiment||r.sentiment||'')===`positive`).length);
+    datasets[1].data.push(sub.filter(r=>sentClass(r.Sentiment||r.sentiment||'')===`neutral`).length);
+    datasets[2].data.push(sub.filter(r=>sentClass(r.Sentiment||r.sentiment||'')===`negative`).length);
+  });
+  datasets.forEach(d => { d.borderRadius = 4; d.borderSkipped = false; });
+
+  makeChart('chart-sent-platform', {
+    type:'bar',
+    data:{ labels:platforms, datasets },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'top', labels:{font:{size:11},boxWidth:12}} },
+      scales:{
+        x:{ grid:{display:false}, stacked:false, ticks:{font:{size:11}} },
+        y:{ grid:{color:'rgba(0,0,0,0.04)'}, beginAtZero:true, ticks:{font:{size:11}} }
+      }
+    }
+  });
+}
+
+// ── TABLE ─────────────────────────────────────────────────────────────
+function renderTable() {
+  const start = (currentPage-1)*PAGE_SIZE;
+  const end = start + PAGE_SIZE;
+  const slice = filteredData.slice(start, end);
+
+  const sentBadge = s => {
+    const c = sentClass(s);
+    return `<span class="badge badge-${c}">${{positive:'Positivo',negative:'Negativo',neutral:'Neutro'}[c]||s}</span>`;
+  };
+
+  const ptBadge = p => {
+    const cl = platformClass(p);
+    return `<span class="badge badge-${cl}">${p||'—'}</span>`;
+  };
+
+  document.getElementById('mentions-tbody').innerHTML = slice.map(r => {
+    const title = (r.Title || r.Snippet || '').substring(0,70) + '...';
+    const domain = r.Domain || r.domain || '—';
+    const pt = r['Page Type'] || r.PageType || '—';
+    const lang = r.Language || r.language || '—';
+    const country = r.Country || r.country || '—';
+    const sent = r.Sentiment || r.sentiment || '—';
+    const likes = parseFloat(r.Likes || r.likes || 0)||0;
+    const shares = parseFloat(r.Shares || r.shares || 0)||0;
+    const date = (r.Date || r.date || '—').substring(0,10);
+    const url = r.Url || r.url || r.URL || '#';
+    return `<tr>
+      <td style="white-space:nowrap">${date}</td>
+      <td><a href="${url}" target="_blank" title="${title}" style="color:var(--embraer-blue);text-decoration:none">${title}</a></td>
+      <td>${domain}</td>
+      <td>${ptBadge(pt)}</td>
+      <td>${lang.toUpperCase()}</td>
+      <td>${country}</td>
+      <td>${sentBadge(sent)}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums">${likes.toLocaleString('pt-BR')}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums">${shares.toLocaleString('pt-BR')}</td>
+    </tr>`;
+  }).join('');
+
+  const total = filteredData.length;
+  const pages = Math.ceil(total/PAGE_SIZE);
+  document.getElementById('table-info').textContent = `Exibindo ${start+1}–${Math.min(end,total)} de ${total.toLocaleString('pt-BR')} menções`;
+
+  const paginEl = document.getElementById('pagination');
+  let html = '';
+  if (currentPage > 1) html += `<button class="pg-btn" onclick="gotoPage(${currentPage-1})">‹ Ant</button>`;
+  const range = 2;
+  for (let p=Math.max(1,currentPage-range); p<=Math.min(pages,currentPage+range); p++) {
+    html += `<button class="pg-btn${p===currentPage?' active':''}" onclick="gotoPage(${p})">${p}</button>`;
+  }
+  if (currentPage < pages) html += `<button class="pg-btn" onclick="gotoPage(${currentPage+1})">Próx ›</button>`;
+  paginEl.innerHTML = html;
+}
+
+function gotoPage(p) { currentPage = p; renderTable(); window.scrollTo({top:0,behavior:'smooth'}); }
+
+// ── RENDER ALL ────────────────────────────────────────────────────────
+function renderAll() {
+  renderKPIs();
+  renderTimeline();
+  renderSentiment();
+  renderPlatform();
+  renderLanguage();
+  renderCountries();
+  renderDomains();
+  renderSentPlatform();
+  renderTable();
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────
+async function init() {
+  try {
+    allData = await loadData();
+    filteredData = [...allData];
+
+    document.getElementById('data-status').textContent = `${allData.length.toLocaleString('pt-BR')} registros carregados`;
+
+    // populate filters
+    populateFilter('f-pagetype', 'Page Type');
+    populateFilter('f-language', 'Language');
+    populateFilter('f-country',  'Country');
+    populateFilter('f-continent','Continent');
+
+    // event listeners
+    ['f-sentiment','f-pagetype','f-language','f-country','f-continent'].forEach(id => {
+      document.getElementById(id).addEventListener('change', applyFilters);
+    });
+
+    document.getElementById('filter-results').textContent = `${allData.length.toLocaleString('pt-BR')} menções`;
+
+    renderAll();
+  } catch(e) {
+    document.getElementById('data-status').textContent = 'Erro ao carregar dados';
+    console.error(e);
+  } finally {
+    const ls = document.getElementById('loading-screen');
+    ls.classList.add('hidden');
+    setTimeout(() => ls.remove(), 700);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
